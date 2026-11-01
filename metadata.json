@@ -1,0 +1,7 @@
+{
+  "name": "VaultFlow - Mobile Money Tracker & Budget Planner",
+  "description": "Personal finance money tracker, expense organizer, and budget planner in Indian Rupees.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
