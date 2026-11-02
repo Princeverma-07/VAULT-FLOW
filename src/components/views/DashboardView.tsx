@@ -2,14 +2,11 @@ import React, { useState } from 'react';
 import {
   TrendingUp,
   TrendingDown,
-  ShieldAlert,
-  Sparkles,
   ArrowRight,
   Plus,
   Receipt,
   PiggyBank,
   ChevronRight,
-  Pencil,
   CheckCircle2,
   Calendar,
   Wallet,
@@ -17,8 +14,6 @@ import {
 } from 'lucide-react';
 import { Category, Transaction, TransactionType } from '../../types';
 import {
-  calculateSafeToSpendToday,
-  calculateBudgetStatus,
   calculateAvailableBalance,
   formatCurrency,
   getDaysInMonth,
@@ -28,7 +23,6 @@ import {
 } from '../../utils/finance';
 import { CategoryIcon } from '../CategoryIcon';
 import { ExpenseDonutChart } from '../charts/ExpenseDonutChart';
-import { EditBudgetModal } from '../EditBudgetModal';
 
 interface DashboardViewProps {
   transactions: Transaction[];
@@ -37,8 +31,8 @@ interface DashboardViewProps {
   privacyMode: boolean;
   selectedMonth: string; // 'YYYY-MM'
   onSelectMonth: (month: string) => void;
-  monthlyBudget: number;
-  onUpdateMonthlyBudget: (amount: number, month?: string) => void;
+  monthlyBudget?: number;
+  onUpdateMonthlyBudget?: (amount: number, month?: string) => void;
   onOpenQuickAdd: (initialType?: TransactionType) => void;
   onNavigateToTab: (tab: any) => void;
 }
@@ -50,12 +44,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   privacyMode,
   selectedMonth,
   onSelectMonth,
-  monthlyBudget,
+  monthlyBudget = 0,
   onUpdateMonthlyBudget,
   onOpenQuickAdd,
   onNavigateToTab,
 }) => {
-  const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   const [yearStr, monthStr] = selectedMonth.split('-');
@@ -105,16 +98,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const netMonthSavings = totalIncome - totalExpense;
   const savingsRate = totalIncome > 0 ? Math.max(0, Math.round((netMonthSavings / totalIncome) * 100)) : 0;
 
-  // Safe daily allowance
-  const safeDailyData = calculateSafeToSpendToday(
-    monthlyBudget,
-    totalExpense,
-    currentDay,
-    totalDays
-  );
-
-  const budgetStatus = calculateBudgetStatus(totalExpense, monthlyBudget);
-
   // Category slices for donut
   const categorySpendingMap = new Map<string, number>();
   for (const t of monthExpenseTransactions) {
@@ -144,16 +127,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const recentTransactions = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     .slice(0, 5);
-
-  const handleSaveBudget = (newLimit: number) => {
-    onUpdateMonthlyBudget(newLimit, selectedMonth);
-    setFeedbackMessage(
-      `Monthly budget updated to ${formatCurrency(newLimit, baseCurrency)} for ${monthName}.`
-    );
-    setTimeout(() => {
-      setFeedbackMessage(null);
-    }, 4500);
-  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -299,46 +272,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Core Metrics: Monthly Budget vs Total Income Received */}
+          {/* Core Metrics: Total Expenses vs Total Income Received */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Metric 1: Monthly Budget (Spending Cap with Edit button) */}
+            {/* Metric 1: Total Expenses (Selected Month) */}
             <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Monthly Budget
+                  Total Expenses
                 </span>
                 <button
                   type="button"
-                  onClick={() => setIsEditBudgetOpen(true)}
-                  className="px-2.5 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                  aria-label="Edit Monthly Budget"
-                  title="Edit Monthly Budget"
+                  onClick={() => onOpenQuickAdd('expense')}
+                  className="px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg flex items-center gap-1 transition-colors cursor-pointer border border-rose-200 dark:border-rose-800"
                 >
-                  <Pencil size={12} />
-                  <span>Edit</span>
+                  <Plus size={12} />
+                  <span>Add</span>
                 </button>
               </div>
 
               <div>
-                <span className="text-2xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight block">
-                  {formatCurrency(monthlyBudget, baseCurrency)}
+                <span className="text-2xl font-black text-rose-600 dark:text-rose-400 tabular-nums tracking-tight block">
+                  - {formatCurrency(totalExpense, baseCurrency, privacyMode)}
                 </span>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {monthlyBudget === 0 ? 'No budget limit set · Tap Edit to set monthly spending cap' : 'Spending target manually set by user'}
+                  {monthExpenseTransactions.length} expense record{monthExpenseTransactions.length === 1 ? '' : 's'} in {monthName.split(' ')[0]}
                 </p>
               </div>
 
               <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
                 <span className="text-slate-500">
-                  Spent: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(totalExpense, baseCurrency, privacyMode)}</span>
+                  Daily Avg: <span className="font-semibold text-slate-800 dark:text-slate-200">{formatCurrency(currentDay > 0 ? totalExpense / currentDay : 0, baseCurrency, privacyMode)}</span>/day
                 </span>
-                <span className={monthlyBudget > 0 && totalExpense > monthlyBudget ? 'text-rose-500 font-semibold' : 'text-emerald-600 dark:text-emerald-400 font-medium'}>
-                  {monthlyBudget === 0
-                    ? 'Flexible spending'
-                    : totalExpense > monthlyBudget
-                    ? `Over by ${formatCurrency(totalExpense - monthlyBudget, baseCurrency)}`
-                    : `${formatCurrency(monthlyBudget - totalExpense, baseCurrency, privacyMode)} left`}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab('transactions')}
+                  className="font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>View All</span>
+                  <ChevronRight size={13} />
+                </button>
               </div>
             </div>
 
@@ -374,76 +346,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   {savingsRate}% saved
                 </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Safe-to-Spend Daily Allowance Widget */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <Sparkles size={15} />
-                </div>
-                <div>
-                  <h2 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-                    Safe-to-Spend Today
-                  </h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {monthlyBudget === 0
-                      ? 'Set a monthly budget to calculate daily allowance'
-                      : `${safeDailyData.remainingDays} days remaining in this billing cycle`}
-                  </p>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span className="text-base font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
-                  {monthlyBudget === 0 ? '₹0' : formatCurrency(safeDailyData.safeDaily, baseCurrency, privacyMode)}
-                </span>
-                <span className="text-[10px] text-slate-400 block font-medium">/ day safe</span>
-              </div>
-            </div>
-
-            {/* Budget Progress Bar */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                <span>Spent: {formatCurrency(totalExpense, baseCurrency, privacyMode)}</span>
-                <span>Budget Limit: {monthlyBudget === 0 ? 'Not set' : formatCurrency(monthlyBudget, baseCurrency)}</span>
-              </div>
-              <div className="h-2.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div
-                  style={{ width: `${monthlyBudget === 0 ? 0 : Math.min(100, budgetStatus.percent)}%` }}
-                  className={`h-full rounded-full transition-all duration-500 ${
-                    budgetStatus.status === 'danger'
-                      ? 'bg-rose-500'
-                      : budgetStatus.status === 'warning'
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-500'
-                  }`}
-                />
-              </div>
-              <div className="flex justify-between items-center text-[11px]">
-                <span className="text-slate-400">
-                  {monthlyBudget === 0 ? 'No spending limit active' : `${budgetStatus.percent}% of budget utilized`}
-                </span>
-                {monthlyBudget > 0 && (budgetStatus.status === 'danger' || totalExpense > monthlyBudget) ? (
-                  <span className="text-rose-500 font-semibold flex items-center gap-1">
-                    <ShieldAlert size={12} /> Over budget by {formatCurrency(totalExpense - monthlyBudget, baseCurrency)}
-                  </span>
-                ) : monthlyBudget > 0 ? (
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-                    {formatCurrency(safeDailyData.remainingBudget, baseCurrency, privacyMode)} remaining
-                  </span>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setIsEditBudgetOpen(true)}
-                    className="text-emerald-600 dark:text-emerald-400 font-medium hover:underline cursor-pointer"
-                  >
-                    + Set Limit
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -633,16 +535,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Edit Monthly Budget Modal */}
-      <EditBudgetModal
-        isOpen={isEditBudgetOpen}
-        onClose={() => setIsEditBudgetOpen(false)}
-        currentBudget={monthlyBudget}
-        month={selectedMonth}
-        baseCurrency={baseCurrency}
-        onSave={handleSaveBudget}
-      />
     </div>
   );
 };

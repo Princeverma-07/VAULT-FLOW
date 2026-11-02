@@ -3,16 +3,11 @@ import {
   PieChart,
   Sliders,
   AlertTriangle,
-  CheckCircle,
-  TrendingDown,
-  Sparkles,
-  Info,
   Calendar,
 } from 'lucide-react';
 import { Category, Transaction } from '../../types';
 import {
   calculateBudgetStatus,
-  calculateSafeToSpendToday,
   formatCurrency,
   getDaysInMonth,
   getAvailableMonthsList,
@@ -20,7 +15,6 @@ import {
   getCurrentMonthKey,
 } from '../../utils/finance';
 import { CategoryIcon } from '../CategoryIcon';
-import { EditBudgetModal } from '../EditBudgetModal';
 
 interface BudgetsViewProps {
   transactions: Transaction[];
@@ -29,8 +23,8 @@ interface BudgetsViewProps {
   privacyMode: boolean;
   selectedMonth: string;
   onSelectMonth?: (month: string) => void;
-  monthlyBudget: number;
-  onUpdateMonthlyBudget: (amount: number, month?: string) => void;
+  monthlyBudget?: number;
+  onUpdateMonthlyBudget?: (amount: number, month?: string) => void;
   onOpenCategoryManager: () => void;
 }
 
@@ -45,9 +39,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   onUpdateMonthlyBudget,
   onOpenCategoryManager,
 }) => {
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [rolloverEnabled, setRolloverEnabled] = useState(true);
 
   const [yearStr, monthStr] = selectedMonth.split('-');
   const year = parseInt(yearStr, 10);
@@ -60,6 +52,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   const isCurrentMonth = now.getMonth() + 1 === month && now.getFullYear() === year;
   const isFutureMonth = now.getFullYear() < year || (now.getFullYear() === year && now.getMonth() + 1 < month);
   const currentDay = isCurrentMonth ? now.getDate() : isFutureMonth ? 1 : totalDays;
+  const remainingDays = Math.max(1, totalDays - currentDay + 1);
 
   const monthName = formatMonthDisplay(selectedMonth);
   const availableMonths = getAvailableMonthsList(transactions);
@@ -68,18 +61,6 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   const monthExpenses = transactions.filter(
     (t) => t.date.startsWith(selectedMonth) && t.type === 'expense'
   );
-
-  const totalExpense = monthExpenses.reduce((sum, t) => sum + t.convertedAmount, 0);
-
-  // Safe daily
-  const safeDaily = calculateSafeToSpendToday(
-    monthlyBudget,
-    totalExpense,
-    currentDay,
-    totalDays
-  );
-
-  const totalBudgetStatus = calculateBudgetStatus(totalExpense, monthlyBudget);
 
   // Category spending vs budget limit
   const categorySpendMap = new Map<string, number>();
@@ -105,11 +86,8 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
     })
     .sort((a, b) => b.status.percent - a.status.percent);
 
-  const handleSaveBudget = (newLimit: number) => {
-    onUpdateMonthlyBudget(newLimit, selectedMonth);
-    setFeedbackMessage(`Monthly budget successfully updated to ${formatCurrency(newLimit, baseCurrency)} for ${monthName}.`);
-    setTimeout(() => setFeedbackMessage(null), 4000);
-  };
+  const totalCategoryBudgeted = budgetedCategories.reduce((sum, c) => sum + c.limit, 0);
+  const totalCategorySpent = budgetedCategories.reduce((sum, c) => sum + c.spent, 0);
 
   return (
     <div className="space-y-6 pb-20">
@@ -170,83 +148,50 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
         </div>
       )}
 
-      {/* Master Monthly Budget Card */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-              Total Monthly Spending Cap ({monthName})
-            </span>
-            <div className="flex items-center gap-2 mt-1">
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight">
-                {formatCurrency(monthlyBudget, baseCurrency)}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setIsEditModalOpen(true)}
-                className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer flex items-center gap-1 border border-emerald-200 dark:border-emerald-800 px-2 py-0.5 rounded-lg"
-              >
-                <span>Edit Budget</span>
-              </button>
+      {/* Category Budgets Overview Summary Card */}
+      {budgetedCategories.length > 0 && (
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Total Category Limits
+              </span>
+              <span className="text-xl font-black text-slate-900 dark:text-white tabular-nums tracking-tight mt-1 block">
+                {formatCurrency(totalCategoryBudgeted, baseCurrency)}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                Across {budgetedCategories.length} active spending categor{budgetedCategories.length === 1 ? 'y' : 'ies'}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Category Spending
+              </span>
+              <span className="text-xl font-black text-rose-600 dark:text-rose-400 tabular-nums tracking-tight mt-1 block">
+                {formatCurrency(totalCategorySpent, baseCurrency, privacyMode)}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                {totalCategoryBudgeted > 0
+                  ? `${Math.round((totalCategorySpent / totalCategoryBudgeted) * 100)}% of category caps utilized`
+                  : 'Tracked in selected cycle'}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Remaining Allowance
+              </span>
+              <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 tabular-nums tracking-tight mt-1 block">
+                {formatCurrency(Math.max(0, totalCategoryBudgeted - totalCategorySpent), baseCurrency, privacyMode)}
+              </span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                {remainingDays} days left in cycle
+              </span>
             </div>
           </div>
-
-          <div className="text-right">
-            <span className="text-xs text-slate-400 block font-medium">Safe Allowance</span>
-            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-              {formatCurrency(safeDaily.safeDaily, baseCurrency, privacyMode)}
-            </span>
-            <span className="text-[10px] text-slate-400 block">/ day remaining</span>
-          </div>
         </div>
-
-        {/* Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
-            <span>Spent: {formatCurrency(totalExpense, baseCurrency, privacyMode)}</span>
-            <span>
-              Remaining: {formatCurrency(safeDaily.remainingBudget, baseCurrency, privacyMode)}
-            </span>
-          </div>
-          <div className="h-3 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-            <div
-              style={{ width: `${Math.min(100, totalBudgetStatus.percent)}%` }}
-              className={`h-full rounded-full transition-all duration-500 ${
-                totalBudgetStatus.status === 'danger'
-                  ? 'bg-rose-500'
-                  : totalBudgetStatus.status === 'warning'
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500'
-              }`}
-            />
-          </div>
-          <div className="flex justify-between text-[11px] text-slate-400">
-            <span>{totalBudgetStatus.percent}% spent</span>
-            <span>{safeDaily.remainingDays} days left in cycle</span>
-          </div>
-        </div>
-
-        {/* Rollover notice */}
-        <div className="pt-2 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 text-xs">
-          <div className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-            <Info size={14} className="text-slate-400" />
-            <span>Budget Rollover (Carry over unspent surplus)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setRolloverEnabled(!rolloverEnabled)}
-            className={`w-9 h-5 rounded-full transition-colors relative ${
-              rolloverEnabled ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
-            }`}
-          >
-            <div
-              className={`w-4 h-4 rounded-full bg-white absolute top-0.5 transition-transform ${
-                rolloverEnabled ? 'left-4.5' : 'left-0.5'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Category Budgets List */}
       <div className="space-y-3">
@@ -340,7 +285,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
                       </span>
                     )}
                     <span className="text-slate-400">
-                      {Math.max(0, cat.limit - cat.spent > 0 ? Math.round(((cat.limit - cat.spent) / safeDaily.remainingDays) * 100) / 100 : 0)}{' '}
+                      {Math.max(0, cat.limit - cat.spent > 0 ? Math.round(((cat.limit - cat.spent) / remainingDays) * 100) / 100 : 0)}{' '}
                       {baseCurrency}/day
                     </span>
                   </div>
@@ -350,16 +295,6 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
           )}
         </div>
       </div>
-
-      {/* Edit Budget Modal */}
-      <EditBudgetModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        currentBudget={monthlyBudget}
-        month={selectedMonth}
-        baseCurrency={baseCurrency}
-        onSave={handleSaveBudget}
-      />
     </div>
   );
 };
