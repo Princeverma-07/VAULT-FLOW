@@ -50,7 +50,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               Plain-Language Overview
             </p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              VaultFlow is a personal financial ledger and budget estimation application. By using this software, you agree that you maintain custody of your own records and understand that calculations are mathematical aids, not regulated financial or tax advice.
+              MONEYMAX is a personal financial ledger and budget estimation application. By using this software, you agree that you maintain custody of your own records and understand that calculations are mathematical aids, not regulated financial or tax advice.
             </p>
           </div>
 
@@ -59,7 +59,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               1. Permitted Personal Use
             </h3>
             <p>
-              VaultFlow is provided for your personal money management, expense tracking, and budget planning. You may record transactions, create custom spending categories, set budget targets, and export reports for your own use.
+              MONEYMAX is provided for your personal money management, expense tracking, and budget planning. You may record transactions, create custom spending categories, set budget targets, and export reports for your own use.
             </p>
           </section>
 
@@ -69,7 +69,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               2. Not Professional Financial or Tax Advice
             </h3>
             <p>
-              The metrics displayed in VaultFlow (such as "Safe-to-Spend Today", savings rates, category allowances, and cashflow projections) are algorithmic estimates based solely on the data you enter. They do not constitute investment advice, banking services, or certified chartered accountancy. Always consult a certified financial planner or tax advisor for statutory filings.
+              The metrics displayed in MONEYMAX (such as "Safe-to-Spend Today", savings rates, category allowances, and cashflow projections) are algorithmic estimates based solely on the data you enter. They do not constitute investment advice, banking services, or certified chartered accountancy. Always consult a certified financial planner or tax advisor for statutory filings.
             </p>
           </section>
 
@@ -78,7 +78,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               3. Custody of Records &amp; Backup Responsibility
             </h3>
             <p>
-              Because VaultFlow operates client-side without remote servers, you are solely responsible for creating regular data backups. We recommend utilizing the built-in "Backup to JSON" feature before clearing browser storage or switching devices.
+              Because MONEYMAX operates client-side without remote servers, you are solely responsible for creating regular data backups. We recommend utilizing the built-in "Backup to JSON" feature before clearing browser storage or switching devices.
             </p>
           </section>
 
@@ -87,7 +87,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               4. Disclaimer of Warranties
             </h3>
             <p>
-              VaultFlow is provided on an "as is" and "as available" basis without warranties of any kind, whether express or implied. In no event shall the authors or copyright holders be liable for any direct, indirect, incidental, or consequential damages arising from the use of or inability to use this application.
+              MONEYMAX is provided on an "as is" and "as available" basis without warranties of any kind, whether express or implied. In no event shall the authors or copyright holders be liable for any direct, indirect, incidental, or consequential damages arising from the use of or inability to use this application.
             </p>
           </section>
 
@@ -96,7 +96,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
               5. Modifications to Terms
             </h3>
             <p>
-              We reserve the right to revise these Terms &amp; Conditions as the application evolves. Continued usage of VaultFlow following updates signifies acceptance of the modified terms.
+              We reserve the right to revise these Terms &amp; Conditions as the application evolves. Continued usage of MONEYMAX following updates signifies acceptance of the modified terms.
             </p>
           </section>
         </div>
@@ -104,7 +104,7 @@ export const TermsConditionsModal: React.FC<TermsConditionsModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
           <span className="text-[11px] text-slate-500">
-            VaultFlow Terms of Service
+            MONEYMAX Terms of Service
           </span>
           <button
             type="button"

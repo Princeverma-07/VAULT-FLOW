@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  Wallet,
   Eye,
   EyeOff,
   Sun,
@@ -8,8 +7,10 @@ import {
   Smartphone,
   Maximize2,
   Lock,
+  Cloud,
 } from 'lucide-react';
 import { SUPPORTED_CURRENCIES } from '../utils/finance';
+import { MoneyMaxLogo } from './MoneyMaxLogo';
 
 interface HeaderProps {
   baseCurrency: string;
@@ -22,6 +23,8 @@ interface HeaderProps {
   onTogglePhoneFrame: () => void;
   onLockApp: () => void;
   hasPin: boolean;
+  onOpenCloudSync?: () => void;
+  isCloudConnected?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -35,18 +38,15 @@ export const Header: React.FC<HeaderProps> = ({
   onTogglePhoneFrame,
   onLockApp,
   hasPin,
+  onOpenCloudSync,
+  isCloudConnected,
 }) => {
   return (
     <header className="sticky top-0 z-30 w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Brand Zone */}
         <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-sm shadow-emerald-600/30">
-            <Wallet size={18} strokeWidth={2.4} />
-          </div>
-          <span className="font-bold text-base tracking-tight text-slate-900 dark:text-white whitespace-nowrap">
-            VaultFlow
-          </span>
+          <MoneyMaxLogo size="md" />
         </div>
 
         {/* Action & Utility Controls Zone */}
@@ -89,6 +89,22 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {isPhoneFrame ? <Maximize2 size={16} /> : <Smartphone size={16} />}
           </button>
+
+          {/* Cloud Sync Button */}
+          {onOpenCloudSync && (
+            <button
+              type="button"
+              onClick={onOpenCloudSync}
+              aria-label="Supabase Cloud Sync"
+              title={isCloudConnected ? 'Supabase Connected' : 'Connect Supabase'}
+              className="relative w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <Cloud size={16} />
+              {isCloudConnected && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-500 border border-white dark:border-slate-900" />
+              )}
+            </button>
+          )}
 
           {/* App Lock Button */}
           {hasPin && (

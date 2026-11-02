@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Lock, Delete } from 'lucide-react';
+import { MoneyMaxLogo } from './MoneyMaxLogo';
 
 interface PinLockModalProps {
   isOpen: boolean;
@@ -48,12 +49,15 @@ export const PinLockModal: React.FC<PinLockModalProps> = ({
       aria-label="Security PIN Screen"
     >
       <div className="w-full max-w-xs flex flex-col items-center text-center">
-        <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mb-4">
-          <Lock size={26} strokeWidth={2.4} />
+        <div className="mb-4">
+          <MoneyMaxLogo size="xl" showText={false} />
         </div>
 
-        <h2 className="text-xl font-bold tracking-tight">VaultFlow Locked</h2>
-        <p className="text-xs text-slate-400 mt-1 mb-8">Enter your 4-digit PIN to access</p>
+        <div className="flex items-center gap-1.5 mb-1">
+          <h2 className="text-xl font-black tracking-tight">MONEY<span className="text-emerald-400">MAX</span></h2>
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-bold uppercase tracking-wider">Locked</span>
+        </div>
+        <p className="text-xs text-slate-400 mb-8">Enter your 4-digit PIN to access your vault</p>
 
         {/* PIN Indicators */}
         <div className={`flex items-center gap-4 mb-10 ${errorShake ? 'animate-bounce text-rose-500' : ''}`}>

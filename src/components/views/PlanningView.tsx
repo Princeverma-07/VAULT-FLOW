@@ -20,6 +20,7 @@ import {
   Scale,
   Trash2,
   X,
+  Cloud,
 } from 'lucide-react';
 import { Category, RecurringBill, SavingsGoal, UserPreferences } from '../../types';
 import { formatCurrency, formatDateISO } from '../../utils/finance';
@@ -43,6 +44,8 @@ interface PlanningViewProps {
   onImportBackup: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onOpenPrivacyPolicy: () => void;
   onOpenTermsConditions: () => void;
+  onOpenCloudSync?: () => void;
+  isCloudConnected?: boolean;
 }
 
 export const PlanningView: React.FC<PlanningViewProps> = ({
@@ -63,6 +66,8 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
   onImportBackup,
   onOpenPrivacyPolicy,
   onOpenTermsConditions,
+  onOpenCloudSync,
+  isCloudConnected,
 }) => {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
   const [isNewBillOpen, setIsNewBillOpen] = useState(false);
@@ -76,7 +81,7 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
   const [pinInput, setPinInput] = useState<string>('');
   const [pinSuccessMsg, setPinSuccessMsg] = useState<string>('');
   const [customDomain, setCustomDomain] = useState<string>(() => {
-    return localStorage.getItem('vaultflow_custom_domain') || '';
+    return localStorage.getItem('moneymax_custom_domain') || localStorage.getItem('vaultflow_custom_domain') || '';
   });
   const [domainSavedMsg, setDomainSavedMsg] = useState<string>('');
 
@@ -492,9 +497,45 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
       <div className="bg-white dark:bg-slate-900 rounded-3xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
         <div>
           <h2 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
-            Data Portability &amp; Local Storage
+            Data Portability &amp; Cloud Sync
           </h2>
-          <p className="text-[11px] text-slate-500">Export or restore your financial vault locally</p>
+          <p className="text-[11px] text-slate-500">Sync with Supabase cloud database or export local backups</p>
+        </div>
+
+        {/* Supabase Cloud Card */}
+        <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Cloud size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  Supabase Cloud Database
+                </span>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                  isCloudConnected
+                    ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {isCloudConnected ? 'Connected' : 'Offline / Local'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Real-time backup, multi-device sync, and authentication
+              </p>
+            </div>
+          </div>
+
+          {onOpenCloudSync && (
+            <button
+              type="button"
+              onClick={onOpenCloudSync}
+              className="px-3.5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-xl transition-colors cursor-pointer shrink-0 text-center"
+            >
+              {isCloudConnected ? 'Manage Cloud Sync' : 'Connect Supabase'}
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
@@ -587,7 +628,7 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
             <button
               type="button"
               onClick={() => {
-                localStorage.setItem('vaultflow_custom_domain', customDomain);
+                localStorage.setItem('moneymax_custom_domain', customDomain);
                 setDomainSavedMsg('Domain saved! CNAME records verified.');
                 setTimeout(() => setDomainSavedMsg(''), 3000);
               }}

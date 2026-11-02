@@ -74,7 +74,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `vaultflow_transactions_${Date.now()}.csv`);
+    link.setAttribute('download', `moneymax_transactions_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

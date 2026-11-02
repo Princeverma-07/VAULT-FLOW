@@ -20,6 +20,14 @@ import { PinLockModal } from './components/PinLockModal';
 import { CategoryManageModal } from './components/CategoryManageModal';
 import { PrivacyPolicyModal } from './components/legal/PrivacyPolicyModal';
 import { TermsConditionsModal } from './components/legal/TermsConditionsModal';
+import { CloudSyncModal } from './components/CloudSyncModal';
+import { getSupabaseConfig, getSupabaseClient } from './lib/supabase';
+import {
+  createRemoteTransaction,
+  deleteRemoteTransaction,
+  updateRemoteMonthlyBudget,
+  fetchRemoteVaultData,
+} from './services/supabaseService';
 
 export default function App() {
   // Clean user state without any demo data
@@ -89,6 +97,30 @@ export default function App() {
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
   const [isTermsConditionsOpen, setIsTermsConditionsOpen] = useState(false);
+  const [isCloudSyncOpen, setIsCloudSyncOpen] = useState(false);
+  const [isCloudConfigured, setIsCloudConfigured] = useState(() => getSupabaseConfig().isConfigured);
+
+  // Check Supabase session on startup and fetch remote data if user is logged in
+  useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      setIsCloudConfigured(true);
+      supabase.auth.getSession().then(({ data }) => {
+        const userId = data.session?.user?.id;
+        if (userId) {
+          fetchRemoteVaultData(userId, categories, preferences).then((remote) => {
+            if (remote && remote.transactions.length > 0) {
+              setTransactions(remote.transactions);
+              setCategories(remote.categories);
+              setSavingsGoals(remote.savingsGoals);
+              setRecurringBills(remote.recurringBills);
+              setPreferences(remote.preferences);
+            }
+          });
+        }
+      });
+    }
+  }, []);
 
   // Keep app synced with live exact current month
   useEffect(() => {
@@ -189,10 +221,28 @@ export default function App() {
     };
 
     setTransactions((prev) => [newTx, ...prev]);
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          createRemoteTransaction(data.session.user.id, newTx);
+        }
+      });
+    }
   };
 
   const handleDeleteTransaction = (id: string) => {
     setTransactions((prev) => prev.filter((t) => t.id !== id));
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          deleteRemoteTransaction(data.session.user.id, id);
+        }
+      });
+    }
   };
 
   const handleOpenQuickAdd = (type: TransactionType = 'expense') => {
@@ -210,6 +260,15 @@ export default function App() {
         [monthKey]: limit,
       },
     }));
+
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          updateRemoteMonthlyBudget(data.session.user.id, monthKey, limit);
+        }
+      });
+    }
   };
 
   const handleUpdateCategoryBudget = (catId: string, limit: number) => {
@@ -289,7 +348,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `vaultflow_backup_${Date.now()}.json`;
+    link.download = `moneymax_backup_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -370,6 +429,8 @@ export default function App() {
           onTogglePhoneFrame={handleTogglePhoneFrame}
           onLockApp={handleLockApp}
           hasPin={Boolean(preferences.pinCode)}
+          onOpenCloudSync={() => setIsCloudSyncOpen(true)}
+          isCloudConnected={isCloudConfigured}
         />
 
         {/* View Content */}
@@ -444,13 +505,19 @@ export default function App() {
               onImportBackup={handleImportBackup}
               onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
               onOpenTermsConditions={() => setIsTermsConditionsOpen(true)}
+              onOpenCloudSync={() => setIsCloudSyncOpen(true)}
+              isCloudConnected={isCloudConfigured}
             />
           )}
         </main>
 
         {/* Quiet, Clean Unboxed Footer with Legal Links */}
         <footer className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 mb-16">
-          <span>VaultFlow Personal Finance (INR)</span>
+          <div className="flex items-center gap-2">
+            <span className="font-black text-slate-800 dark:text-slate-200">MONEY<span className="text-emerald-600 dark:text-emerald-400">MAX</span></span>
+            <span>•</span>
+            <span>Smart Personal Finance &amp; Expense Manager (INR)</span>
+          </div>
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -508,6 +575,27 @@ export default function App() {
       <TermsConditionsModal
         isOpen={isTermsConditionsOpen}
         onClose={() => setIsTermsConditionsOpen(false)}
+      />
+
+      {/* Supabase Cloud Connection & Sync Modal */}
+      <CloudSyncModal
+        isOpen={isCloudSyncOpen}
+        onClose={() => {
+          setIsCloudSyncOpen(false);
+          setIsCloudConfigured(getSupabaseConfig().isConfigured);
+        }}
+        transactions={transactions}
+        categories={categories}
+        savingsGoals={savingsGoals}
+        recurringBills={recurringBills}
+        preferences={preferences}
+        onApplyRemoteVault={(remote) => {
+          setTransactions(remote.transactions);
+          setCategories(remote.categories);
+          setSavingsGoals(remote.savingsGoals);
+          setRecurringBills(remote.recurringBills);
+          setPreferences(remote.preferences);
+        }}
       />
     </div>
   );

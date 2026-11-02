@@ -52,7 +52,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               <span>Core Commitment: 100% Client-Side Private Storage</span>
             </div>
             <p className="text-[11px] text-emerald-700 dark:text-emerald-400">
-              VaultFlow is designed from the ground up to respect your financial privacy. Your income, expenses, budgets, notes, and merchant names never leave your web browser. There are no remote tracking databases, no ad networks, and no external analytics.
+              MONEYMAX is designed from the ground up to respect your financial privacy. Your income, expenses, budgets, notes, and merchant names never leave your web browser. There are no remote tracking databases, no ad networks, and no external analytics.
             </p>
           </div>
 
@@ -62,7 +62,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               1. Information We Do Not Collect
             </h3>
             <p>
-              Unlike traditional banking and fintech aggregators, VaultFlow does not require an account, email address, phone number, or bank credentials. We do not transmit or store:
+              Unlike traditional banking and fintech aggregators, MONEYMAX does not require an account, email address, phone number, or bank credentials. We do not transmit or store:
             </p>
             <ul className="list-disc pl-5 space-y-1 text-slate-600 dark:text-slate-400">
               <li>Bank login credentials, account numbers, or OTP codes.</li>
@@ -91,7 +91,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
               3. Zero Third-Party Sharing &amp; Telemetry
             </h3>
             <p>
-              We do not sell, rent, monetize, or disclose your financial information. No third-party analytics SDKs, advertising cookies, behavioral fingerprinting, or tracking pixels are included in VaultFlow.
+              We do not sell, rent, monetize, or disclose your financial information. No third-party analytics SDKs, advertising cookies, behavioral fingerprinting, or tracking pixels are included in MONEYMAX.
             </p>
           </section>
 
@@ -122,7 +122,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 flex items-center justify-between">
           <span className="text-[11px] text-slate-500">
-            VaultFlow Local Privacy Standard
+            MONEYMAX Local Privacy Standard
           </span>
           <button
             type="button"

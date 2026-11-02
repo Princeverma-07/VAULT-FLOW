@@ -39,7 +39,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `vaultflow_statement_${selectedMonth}.csv`);
+    link.setAttribute('download', `moneymax_statement_${selectedMonth}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
