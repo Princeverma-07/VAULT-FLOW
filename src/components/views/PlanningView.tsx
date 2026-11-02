@@ -18,19 +18,25 @@ import {
   Globe,
   FileText,
   Scale,
+  Trash2,
+  X,
 } from 'lucide-react';
-import { RecurringBill, SavingsGoal, UserPreferences } from '../../types';
-import { formatCurrency } from '../../utils/finance';
+import { Category, RecurringBill, SavingsGoal, UserPreferences } from '../../types';
+import { formatCurrency, formatDateISO } from '../../utils/finance';
 import { SavingsGoalModal } from '../SavingsGoalModal';
 
 interface PlanningViewProps {
   savingsGoals: SavingsGoal[];
   recurringBills: RecurringBill[];
+  categories: Category[];
   preferences: UserPreferences;
   baseCurrency: string;
   privacyMode: boolean;
   onAddSavingsGoal: (goal: SavingsGoal) => void;
+  onDeleteSavingsGoal?: (goalId: string) => void;
   onDepositToGoal: (goalId: string, amount: number) => void;
+  onAddRecurringBill?: (bill: RecurringBill) => void;
+  onDeleteRecurringBill?: (billId: string) => void;
   onUpdatePreferences: (prefs: Partial<UserPreferences>) => void;
   onResetData: () => void;
   onExportBackup: () => void;
@@ -42,11 +48,15 @@ interface PlanningViewProps {
 export const PlanningView: React.FC<PlanningViewProps> = ({
   savingsGoals,
   recurringBills,
+  categories,
   preferences,
   baseCurrency,
   privacyMode,
   onAddSavingsGoal,
+  onDeleteSavingsGoal,
   onDepositToGoal,
+  onAddRecurringBill,
+  onDeleteRecurringBill,
   onUpdatePreferences,
   onResetData,
   onExportBackup,
@@ -55,6 +65,12 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
   onOpenTermsConditions,
 }) => {
   const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [isNewBillOpen, setIsNewBillOpen] = useState(false);
+  const [billName, setBillName] = useState('');
+  const [billAmountStr, setBillAmountStr] = useState('');
+  const [billCycle, setBillCycle] = useState<'monthly' | 'yearly'>('monthly');
+  const [billDate, setBillDate] = useState(formatDateISO(new Date()));
+  const [billCategory, setBillCategory] = useState('cat_utilities');
   const [depositGoalId, setDepositGoalId] = useState<string | null>(null);
   const [depositAmountStr, setDepositAmountStr] = useState<string>('1000');
   const [pinInput, setPinInput] = useState<string>('');
@@ -164,9 +180,21 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
                       </p>
                     </div>
 
-                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                      {pct}%
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {pct}%
+                      </span>
+                      {onDeleteSavingsGoal && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteSavingsGoal(g.id)}
+                          aria-label={`Delete ${g.name}`}
+                          className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Progress bar */}
@@ -246,13 +274,106 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
             </div>
           </div>
 
-          <div className="text-right">
-            <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
-              {formatCurrency(totalRecurringMonthly, baseCurrency, privacyMode)}
-            </span>
-            <span className="text-[10px] text-slate-400 block font-medium">/ month</span>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
+                {formatCurrency(totalRecurringMonthly, baseCurrency, privacyMode)}
+              </span>
+              <span className="text-[10px] text-slate-400 block font-medium">/ month</span>
+            </div>
+
+            {onAddRecurringBill && (
+              <button
+                type="button"
+                onClick={() => setIsNewBillOpen(!isNewBillOpen)}
+                className="px-2.5 py-1 text-xs font-semibold rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800 flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <Plus size={13} />
+                <span>Add Bill</span>
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Add Recurring Bill Form */}
+        {isNewBillOpen && onAddRecurringBill && (
+          <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-300">New Subscription or Recurring Bill</span>
+              <button
+                type="button"
+                onClick={() => setIsNewBillOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <input
+                type="text"
+                placeholder="Bill name (e.g. Wi-Fi, Gym, Netflix)"
+                value={billName}
+                onChange={(e) => setBillName(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200"
+              />
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-bold text-slate-400 pl-1">₹</span>
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  value={billAmountStr}
+                  onChange={(e) => setBillAmountStr(e.target.value)}
+                  className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs rounded-xl px-3 py-2 text-slate-800 dark:text-slate-200"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <select
+                value={billCycle}
+                onChange={(e) => setBillCycle(e.target.value as any)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs rounded-xl px-2.5 py-2 text-slate-800 dark:text-slate-200"
+              >
+                <option value="monthly">Monthly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+
+              <input
+                type="date"
+                value={billDate}
+                onChange={(e) => setBillDate(e.target.value)}
+                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs rounded-xl px-2.5 py-2 text-slate-800 dark:text-slate-200"
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  const amt = parseFloat(billAmountStr);
+                  if (billName.trim() && !isNaN(amt) && amt > 0) {
+                    onAddRecurringBill({
+                      id: `rec_${Date.now()}`,
+                      name: billName.trim(),
+                      amount: amt,
+                      currency: baseCurrency,
+                      categoryId: billCategory,
+                      billingCycle: billCycle,
+                      nextBillingDate: billDate,
+                      autoDeduct: true,
+                      iconName: 'Repeat',
+                    });
+                    setBillName('');
+                    setBillAmountStr('');
+                    setIsNewBillOpen(false);
+                  }
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Save Bill
+              </button>
+            </div>
+          </div>
+        )}
 
         {recurringBills.length === 0 ? (
           <div className="py-6 px-4 text-center">
@@ -277,13 +398,26 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
                   </p>
                 </div>
 
-                <div className="text-right shrink-0">
-                  <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
-                    {formatCurrency(b.amount, baseCurrency, privacyMode)}
-                  </span>
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block">
-                    {b.autoDeduct ? 'Auto-debit active' : 'Manual pay'}
-                  </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <div className="text-right">
+                    <span className="text-xs font-bold text-slate-900 dark:text-white tabular-nums">
+                      {formatCurrency(b.amount, baseCurrency, privacyMode)}
+                    </span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block">
+                      {b.autoDeduct ? 'Auto-debit active' : 'Manual pay'}
+                    </span>
+                  </div>
+
+                  {onDeleteRecurringBill && (
+                    <button
+                      type="button"
+                      onClick={() => onDeleteRecurringBill(b.id)}
+                      aria-label={`Delete ${b.name}`}
+                      className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

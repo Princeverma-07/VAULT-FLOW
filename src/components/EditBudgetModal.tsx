@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Check, Sliders, AlertCircle } from 'lucide-react';
-import { formatCurrency } from '../utils/finance';
+import { formatCurrency, formatMonthDisplay } from '../utils/finance';
 
 interface EditBudgetModalProps {
   isOpen: boolean;
@@ -19,31 +19,21 @@ export const EditBudgetModal: React.FC<EditBudgetModalProps> = ({
   baseCurrency,
   onSave,
 }) => {
-  const [budgetStr, setBudgetStr] = useState<string>(currentBudget.toString());
+  const [budgetStr, setBudgetStr] = useState<string>(
+    currentBudget > 0 ? currentBudget.toString() : ''
+  );
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
     if (isOpen) {
-      setBudgetStr(currentBudget.toString());
+      setBudgetStr(currentBudget > 0 ? currentBudget.toString() : '');
       setError('');
     }
   }, [isOpen, currentBudget]);
 
   if (!isOpen) return null;
 
-  // Format month for display (e.g., "2026-10" -> "October 2026")
-  const formatMonthName = (mStr: string) => {
-    const parts = mStr.split('-');
-    if (parts.length === 2) {
-      const year = parseInt(parts[0], 10);
-      const monthIdx = parseInt(parts[1], 10) - 1;
-      const date = new Date(year, monthIdx, 1);
-      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-    }
-    return mStr;
-  };
-
-  const monthLabel = formatMonthName(month);
+  const monthLabel = formatMonthDisplay(month);
 
   const handleQuickAdd = (increment: number) => {
     const current = parseFloat(budgetStr) || 0;
@@ -59,13 +49,19 @@ export const EditBudgetModal: React.FC<EditBudgetModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = parseFloat(budgetStr);
-    if (isNaN(parsed) || parsed <= 0) {
-      setError('Please enter a valid monthly budget limit greater than ₹0.');
+    if (budgetStr.trim() === '') {
+      onSave(0);
+      onClose();
       return;
     }
 
-    onSave(parsed);
+    const parsed = parseFloat(budgetStr);
+    if (isNaN(parsed) || parsed < 0) {
+      setError('Please enter a valid monthly budget amount (₹0 or greater).');
+      return;
+    }
+
+    onSave(Math.round(parsed));
     onClose();
   };
 
@@ -128,7 +124,8 @@ export const EditBudgetModal: React.FC<EditBudgetModalProps> = ({
                 id="budget-amount-input"
                 type="number"
                 step="500"
-                min="100"
+                min="0"
+                placeholder="e.g. 50000"
                 value={budgetStr}
                 onChange={(e) => {
                   setBudgetStr(e.target.value);
@@ -141,8 +138,7 @@ export const EditBudgetModal: React.FC<EditBudgetModalProps> = ({
                   }
                 }}
                 autoFocus
-                required
-                className="w-48 text-3xl font-extrabold text-slate-900 dark:text-white bg-transparent text-center focus:outline-none tabular-nums"
+                className="w-48 text-3xl font-extrabold text-slate-900 dark:text-white bg-transparent text-center focus:outline-none tabular-nums placeholder:text-slate-300 dark:placeholder:text-slate-700"
               />
             </div>
           </div>

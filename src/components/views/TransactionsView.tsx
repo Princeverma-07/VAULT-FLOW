@@ -11,7 +11,7 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import { Category, PaymentAccount, Transaction, TransactionType } from '../../types';
-import { formatCurrency, generateCSV } from '../../utils/finance';
+import { formatCurrency, generateCSV, getAvailableMonthsList, formatMonthDisplay } from '../../utils/finance';
 import { CategoryIcon } from '../CategoryIcon';
 
 interface TransactionsViewProps {
@@ -35,12 +35,10 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
   const [selectedType, setSelectedType] = useState<TransactionType | 'all'>('all');
   const [selectedAccount, setSelectedAccount] = useState<PaymentAccount | 'all'>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
-  const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all' or '2026-10', etc.
+  const [selectedMonth, setSelectedMonth] = useState<string>('all'); // 'all' or 'YYYY-MM'
 
-  // Extract unique months from transactions for filter
-  const availableMonths = Array.from(
-    new Set(transactions.map((t) => t.date.substring(0, 7)))
-  ).sort().reverse();
+  // Extract available months dynamically
+  const availableMonths = getAvailableMonthsList(transactions);
 
   // Filter transactions
   const filteredTransactions = transactions.filter((t) => {
@@ -159,7 +157,7 @@ export const TransactionsView: React.FC<TransactionsViewProps> = ({
             <option value="all">All Months</option>
             {availableMonths.map((m) => (
               <option key={m} value={m}>
-                {m}
+                {formatMonthDisplay(m, true)}
               </option>
             ))}
           </select>

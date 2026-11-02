@@ -7,6 +7,7 @@ import {
   TrendingDown,
   Sparkles,
   Info,
+  Calendar,
 } from 'lucide-react';
 import { Category, Transaction } from '../../types';
 import {
@@ -14,6 +15,9 @@ import {
   calculateSafeToSpendToday,
   formatCurrency,
   getDaysInMonth,
+  getAvailableMonthsList,
+  formatMonthDisplay,
+  getCurrentMonthKey,
 } from '../../utils/finance';
 import { CategoryIcon } from '../CategoryIcon';
 import { EditBudgetModal } from '../EditBudgetModal';
@@ -24,6 +28,7 @@ interface BudgetsViewProps {
   baseCurrency: string;
   privacyMode: boolean;
   selectedMonth: string;
+  onSelectMonth?: (month: string) => void;
   monthlyBudget: number;
   onUpdateMonthlyBudget: (amount: number, month?: string) => void;
   onOpenCategoryManager: () => void;
@@ -35,6 +40,7 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   baseCurrency,
   privacyMode,
   selectedMonth,
+  onSelectMonth,
   monthlyBudget,
   onUpdateMonthlyBudget,
   onOpenCategoryManager,
@@ -48,12 +54,15 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   const month = parseInt(monthStr, 10);
   const totalDays = getDaysInMonth(year, month - 1);
   const now = new Date();
-  const currentDay = now.getMonth() + 1 === month ? now.getDate() : Math.min(20, totalDays);
+  
+  const liveCurrentMonthKey = getCurrentMonthKey();
+  const isViewingCurrentMonth = selectedMonth === liveCurrentMonthKey;
+  const isCurrentMonth = now.getMonth() + 1 === month && now.getFullYear() === year;
+  const isFutureMonth = now.getFullYear() < year || (now.getFullYear() === year && now.getMonth() + 1 < month);
+  const currentDay = isCurrentMonth ? now.getDate() : isFutureMonth ? 1 : totalDays;
 
-  const monthName = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
-    month: 'long',
-    year: 'numeric',
-  });
+  const monthName = formatMonthDisplay(selectedMonth);
+  const availableMonths = getAvailableMonthsList(transactions);
 
   // Month transactions
   const monthExpenses = transactions.filter(
@@ -105,22 +114,53 @@ export const BudgetsView: React.FC<BudgetsViewProps> = ({
   return (
     <div className="space-y-6 pb-20">
       {/* Title & Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
             Budget Planning
           </h1>
-          <p className="text-xs text-slate-500">Plan monthly caps &amp; manage spending pacing</p>
+          <p className="text-xs text-slate-500">
+            Cycle: <span className="font-semibold text-slate-800 dark:text-slate-200">{monthName}</span>
+            {!isViewingCurrentMonth && onSelectMonth && (
+              <button
+                type="button"
+                onClick={() => onSelectMonth(liveCurrentMonthKey)}
+                className="ml-2 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+              >
+                (Jump to Current Month)
+              </button>
+            )}
+          </p>
         </div>
 
-        <button
-          type="button"
-          onClick={onOpenCategoryManager}
-          className="px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
-        >
-          <Sliders size={14} />
-          <span>Edit Limits</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onSelectMonth && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 text-xs shadow-xs">
+              <Calendar size={13} className="text-slate-400 shrink-0" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => onSelectMonth(e.target.value)}
+                aria-label="Select budget cycle month"
+                className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
+              >
+                {availableMonths.map((m) => (
+                  <option key={m} value={m} className="bg-white dark:bg-slate-900">
+                    {formatMonthDisplay(m, true)}{m === liveCurrentMonthKey ? ' (Current)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onOpenCategoryManager}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 dark:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
+          >
+            <Sliders size={14} />
+            <span>Edit Limits</span>
+          </button>
+        </div>
       </div>
 
       {/* Feedback Message */}

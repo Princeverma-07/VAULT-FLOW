@@ -43,8 +43,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
   const [source, setSource] = useState<string>('');
   const [note, setNote] = useState<string>('');
   const [receiptAttached, setReceiptAttached] = useState<boolean>(false);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [receiptFileName, setReceiptFileName] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -56,7 +57,9 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
       setSource('');
       setNote('');
       setReceiptAttached(false);
+      setReceiptFileName('');
       setErrorMessage('');
+      setDate(formatDateISO(new Date()));
     }
   }, [isOpen, initialType]);
 
@@ -107,26 +110,23 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
     onClose();
   };
 
-  const handleSimulateScan = () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      setIsScanning(false);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
       setReceiptAttached(true);
-      // Populate realistic scanned Indian receipt data
-      const sampleReceipts = [
-        { merchant: 'Blinkit Instant Groceries', amount: '648', categoryId: 'cat_groceries', note: 'Dairy, bread, and fruits' },
-        { merchant: 'Swiggy Food Delivery', amount: '480', categoryId: 'cat_dining', note: 'Dinner order via UPI' },
-        { merchant: 'HPCL Petrol Pump', amount: '1200', categoryId: 'cat_transport', note: 'Unleaded fuel fill-up' },
-        { merchant: 'Amazon India', amount: '1499', categoryId: 'cat_shopping', note: 'Office stationery & supplies' },
-      ];
-      const picked = sampleReceipts[Math.floor(Math.random() * sampleReceipts.length)];
-      setMerchant(picked.merchant);
-      setAmountStr(picked.amount);
-      if (categories.some((c) => c.id === picked.categoryId)) {
-        setCategoryId(picked.categoryId);
+      setReceiptFileName(file.name);
+      if (!note.trim()) {
+        setNote(`Receipt: ${file.name}`);
       }
-      setNote(picked.note);
-    }, 700);
+    }
+  };
+
+  const handleRemoveReceipt = () => {
+    setReceiptAttached(false);
+    setReceiptFileName('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -402,50 +402,48 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({
             />
           </div>
 
-          {/* Smart Receipt Scanner Affordance only for expense */}
-          {type === 'expense' && (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-700">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
-                  <Camera size={16} />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                    {receiptAttached ? 'Receipt Attached & Parsed' : 'Quick Receipt Auto-Fill'}
-                  </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    {receiptAttached
-                      ? 'Merchant and total extracted successfully'
-                      : 'Simulate mobile camera OCR receipt capture'}
-                  </p>
-                </div>
+          {/* Real Receipt / Bill Attachment Affordance */}
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*,.pdf"
+              className="hidden"
+            />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-2 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 shrink-0">
+                <Camera size={16} />
               </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {receiptAttached ? receiptFileName || 'Receipt File Attached' : 'Attach Bill or Receipt'}
+                </p>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {receiptAttached ? 'Image / PDF receipt saved' : 'Optional document proof for your records'}
+                </p>
+              </div>
+            </div>
 
+            {receiptAttached ? (
               <button
                 type="button"
-                onClick={handleSimulateScan}
-                disabled={isScanning}
-                className="px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                onClick={handleRemoveReceipt}
+                className="px-2.5 py-1 text-xs font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer shrink-0"
               >
-                {isScanning ? (
-                  <>
-                    <Sparkles size={13} className="animate-spin" />
-                    <span>Scanning...</span>
-                  </>
-                ) : receiptAttached ? (
-                  <>
-                    <Check size={13} />
-                    <span>Scanned</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={13} />
-                    <span>Scan Receipt</span>
-                  </>
-                )}
+                Remove
               </button>
-            </div>
-          )}
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-3 py-1.5 text-xs font-semibold bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-slate-200 rounded-lg transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
+              >
+                <Plus size={13} />
+                <span>Upload</span>
+              </button>
+            )}
+          </div>
 
           {/* Submit Action */}
           <div className="pt-2">

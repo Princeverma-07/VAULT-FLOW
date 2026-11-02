@@ -7,7 +7,7 @@ import {
   INITIAL_USER_PREFERENCES,
 } from './data/initialData';
 import { Category, RecurringBill, SavingsGoal, Transaction, TransactionType, UserPreferences } from './types';
-import { convertCurrency, getEffectiveMonthlyBudget, SUPPORTED_CURRENCIES } from './utils/finance';
+import { convertCurrency, getCurrentMonthKey, getEffectiveMonthlyBudget, SUPPORTED_CURRENCIES } from './utils/finance';
 import { Header } from './components/Header';
 import { BottomNav, TabId } from './components/BottomNav';
 import { DashboardView } from './components/views/DashboardView';
@@ -83,12 +83,27 @@ export default function App() {
   });
 
   const [activeTab, setActiveTab] = useState<TabId>('home');
-  const [selectedMonth, setSelectedMonth] = useState<string>('2026-10');
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => getCurrentMonthKey());
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [quickAddType, setQuickAddType] = useState<TransactionType>('expense');
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState(false);
   const [isTermsConditionsOpen, setIsTermsConditionsOpen] = useState(false);
+
+  // Keep app synced with live exact current month
+  useEffect(() => {
+    const liveMonth = getCurrentMonthKey();
+    setSelectedMonth(liveMonth);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const currentLive = getCurrentMonthKey();
+        setSelectedMonth((prev) => prev || currentLive);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -207,8 +222,24 @@ export default function App() {
     setCategories((prev) => [...prev, newCat]);
   };
 
+  const handleDeleteCategory = (catId: string) => {
+    setCategories((prev) => prev.filter((c) => c.id !== catId));
+  };
+
   const handleAddSavingsGoal = (newGoal: SavingsGoal) => {
     setSavingsGoals((prev) => [...prev, newGoal]);
+  };
+
+  const handleDeleteSavingsGoal = (goalId: string) => {
+    setSavingsGoals((prev) => prev.filter((g) => g.id !== goalId));
+  };
+
+  const handleAddRecurringBill = (newBill: RecurringBill) => {
+    setRecurringBills((prev) => [...prev, newBill]);
+  };
+
+  const handleDeleteRecurringBill = (billId: string) => {
+    setRecurringBills((prev) => prev.filter((b) => b.id !== billId));
   };
 
   const handleDepositToGoal = (goalId: string, amount: number) => {
@@ -286,9 +317,8 @@ export default function App() {
         if (data.preferences) {
           setPreferences(data.preferences);
         }
-        alert('Vault successfully restored from backup file!');
       } catch (err) {
-        alert('Failed to parse backup JSON file.');
+        console.error('Failed to parse backup JSON file', err);
       }
     };
     reader.readAsText(file);
@@ -377,6 +407,7 @@ export default function App() {
               baseCurrency={preferences.baseCurrency}
               privacyMode={preferences.privacyMode}
               selectedMonth={selectedMonth}
+              onSelectMonth={setSelectedMonth}
               monthlyBudget={getEffectiveMonthlyBudget(preferences, selectedMonth)}
               onUpdateMonthlyBudget={handleUpdateMonthlyBudget}
               onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
@@ -398,11 +429,15 @@ export default function App() {
             <PlanningView
               savingsGoals={savingsGoals}
               recurringBills={recurringBills}
+              categories={categories}
               preferences={preferences}
               baseCurrency={preferences.baseCurrency}
               privacyMode={preferences.privacyMode}
               onAddSavingsGoal={handleAddSavingsGoal}
+              onDeleteSavingsGoal={handleDeleteSavingsGoal}
               onDepositToGoal={handleDepositToGoal}
+              onAddRecurringBill={handleAddRecurringBill}
+              onDeleteRecurringBill={handleDeleteRecurringBill}
               onUpdatePreferences={(p) => setPreferences((prev) => ({ ...prev, ...p }))}
               onResetData={handleResetData}
               onExportBackup={handleExportBackup}
@@ -458,6 +493,7 @@ export default function App() {
         onClose={() => setIsCategoryManagerOpen(false)}
         categories={categories}
         onAddCategory={handleAddCategory}
+        onDeleteCategory={handleDeleteCategory}
         onUpdateCategoryBudget={handleUpdateCategoryBudget}
         baseCurrency={preferences.baseCurrency}
       />

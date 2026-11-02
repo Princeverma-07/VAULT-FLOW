@@ -285,3 +285,63 @@ export function getEffectiveMonthlyBudget(
   return typeof preferences.overallMonthlyBudget === 'number' ? preferences.overallMonthlyBudget : 0;
 }
 
+/**
+ * Returns the current month key in 'YYYY-MM' format based on local system time.
+ */
+export function getCurrentMonthKey(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
+/**
+ * Returns formatted month display string e.g. "November 2026" or "Nov 2026"
+ */
+export function formatMonthDisplay(yearMonth: string, short: boolean = false): string {
+  const parts = yearMonth.split('-');
+  if (parts.length === 2) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    if (!isNaN(y) && !isNaN(m)) {
+      const d = new Date(y, m, 1);
+      return d.toLocaleDateString('en-US', {
+        month: short ? 'short' : 'long',
+        year: 'numeric',
+      });
+    }
+  }
+  return yearMonth;
+}
+
+/**
+ * Computes a list of available months for selection:
+ * Includes current month, recent months, and all months from recorded transactions.
+ */
+export function getAvailableMonthsList(
+  transactions: Transaction[] = [],
+  baseDate: Date = new Date(),
+  pastMonthsCount: number = 4
+): string[] {
+  const monthSet = new Set<string>();
+
+  // Add past N months from base date
+  for (let i = 0; i <= pastMonthsCount; i++) {
+    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - i, 1);
+    monthSet.add(getCurrentMonthKey(d));
+  }
+
+  // Add next month for forward budget planning
+  const nextMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 1);
+  monthSet.add(getCurrentMonthKey(nextMonth));
+
+  // Add any transaction months
+  for (const t of transactions) {
+    if (t.date && t.date.length >= 7) {
+      monthSet.add(t.date.substring(0, 7));
+    }
+  }
+
+  return Array.from(monthSet).sort().reverse();
+}
+
+

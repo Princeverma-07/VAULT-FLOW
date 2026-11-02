@@ -9,6 +9,9 @@ import {
   calculateCategorySpending,
   calculateAvailableBalance,
   getEffectiveMonthlyBudget,
+  getCurrentMonthKey,
+  formatMonthDisplay,
+  getAvailableMonthsList,
   SUPPORTED_CURRENCIES,
 } from './finance';
 import { Category, Transaction } from '../types';
@@ -264,5 +267,18 @@ test('Clean zero state: handles empty transactions and zero budget without divis
   assert.equal(safeDaily.safeDaily, 0);
   assert.equal(safeDaily.remainingBudget, 0);
   assert.equal(safeDaily.isOverBudget, true);
+});
+
+test('Month helpers: getCurrentMonthKey, formatMonthDisplay, and getAvailableMonthsList work dynamically', () => {
+  const d = new Date(2026, 10, 1); // Nov 2026
+  assert.equal(getCurrentMonthKey(d), '2026-11');
+  assert.equal(formatMonthDisplay('2026-11'), 'November 2026');
+  assert.equal(formatMonthDisplay('2026-11', true), 'Nov 2026');
+
+  const months = getAvailableMonthsList([], d, 2);
+  // Nov 2026, Dec 2026 (next), Oct 2026, Sep 2026
+  assert.ok(months.includes('2026-11'));
+  assert.ok(months.includes('2026-12'));
+  assert.ok(months.includes('2026-10'));
 });
 

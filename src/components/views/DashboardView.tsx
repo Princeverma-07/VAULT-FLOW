@@ -22,6 +22,9 @@ import {
   calculateAvailableBalance,
   formatCurrency,
   getDaysInMonth,
+  getAvailableMonthsList,
+  formatMonthDisplay,
+  getCurrentMonthKey,
 } from '../../utils/finance';
 import { CategoryIcon } from '../CategoryIcon';
 import { ExpenseDonutChart } from '../charts/ExpenseDonutChart';
@@ -60,18 +63,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const month = parseInt(monthStr, 10);
   const totalDays = getDaysInMonth(year, month - 1);
   const now = new Date();
-  const currentDay = now.getMonth() + 1 === month ? now.getDate() : Math.min(20, totalDays);
+  
+  const liveCurrentMonthKey = getCurrentMonthKey();
+  const isViewingCurrentMonth = selectedMonth === liveCurrentMonthKey;
+  const isCurrentMonth = now.getMonth() + 1 === month && now.getFullYear() === year;
+  const isFutureMonth = now.getFullYear() < year || (now.getFullYear() === year && now.getMonth() + 1 < month);
+  const currentDay = isCurrentMonth ? now.getDate() : isFutureMonth ? 1 : totalDays;
 
-  // Month label (e.g. October 2026)
-  const monthName = new Date(year, month - 1, 1).toLocaleDateString('en-US', {
-    month: 'long',
+  // Exact live formatted date (e.g. Mon, 2 Nov 2026)
+  const todayFormatted = now.toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
     year: 'numeric',
   });
 
-  // Unique months from transactions for quick switching
-  const availableMonths = Array.from(
-    new Set(['2026-10', '2026-09', '2026-11', ...transactions.map((t) => t.date.substring(0, 7))])
-  ).sort().reverse();
+  // Month label (e.g. November 2026)
+  const monthName = formatMonthDisplay(selectedMonth);
+
+  // Available months dynamically computed from transactions and current date
+  const availableMonths = getAvailableMonthsList(transactions);
 
   // 1. Available Balance: cumulative real balance across all transactions (income - expense)
   const availableBalance = calculateAvailableBalance(transactions, baseCurrency);
@@ -149,11 +160,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Top Controls Bar: Month Picker & Quick Add Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Financial Dashboard
-          </h1>
-          <p className="text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+              Financial Dashboard
+            </h1>
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 text-[11px] font-semibold border border-emerald-200 dark:border-emerald-800">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Today: {todayFormatted}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
             Overview for <span className="font-semibold text-slate-800 dark:text-slate-200">{monthName}</span>
+            {!isViewingCurrentMonth && (
+              <button
+                type="button"
+                onClick={() => onSelectMonth(liveCurrentMonthKey)}
+                className="ml-2 font-semibold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
+              >
+                (Jump to Current Month)
+              </button>
+            )}
           </p>
         </div>
 
@@ -167,16 +193,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               aria-label="Select month"
               className="bg-transparent text-slate-800 dark:text-slate-200 font-semibold focus:outline-none cursor-pointer"
             >
-              {availableMonths.map((m) => {
-                const parts = m.split('-');
-                const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
-                const label = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-                return (
-                  <option key={m} value={m} className="bg-white dark:bg-slate-900">
-                    {label}
-                  </option>
-                );
-              })}
+              {availableMonths.map((m) => (
+                <option key={m} value={m} className="bg-white dark:bg-slate-900">
+                  {formatMonthDisplay(m, true)}{m === liveCurrentMonthKey ? ' (Current)' : ''}
+                </option>
+              ))}
             </select>
           </div>
 

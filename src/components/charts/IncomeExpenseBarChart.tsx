@@ -1,25 +1,35 @@
 import React from 'react';
 import { Transaction } from '../../types';
-import { calculateMonthlyCashflow, formatCurrency } from '../../utils/finance';
+import {
+  calculateMonthlyCashflow,
+  formatCurrency,
+  getCurrentMonthKey,
+  formatMonthDisplay,
+} from '../../utils/finance';
 
 interface IncomeExpenseBarChartProps {
   transactions: Transaction[];
   baseCurrency: string;
   isMasked?: boolean;
+  selectedMonth?: string;
 }
 
 export const IncomeExpenseBarChart: React.FC<IncomeExpenseBarChartProps> = ({
   transactions,
   baseCurrency,
   isMasked = false,
+  selectedMonth,
 }) => {
-  // Let's compute monthly cashflows for current and past 3 months
-  // e.g. 2026-08, 2026-09, 2026-10
-  const months = [
-    { key: '2026-08', label: 'Aug' },
-    { key: '2026-09', label: 'Sep' },
-    { key: '2026-10', label: 'Oct' },
-  ];
+  // Compute the 3 consecutive months ending with selectedMonth or current month
+  const targetKey = selectedMonth || getCurrentMonthKey();
+  const [tYear, tMonth] = targetKey.split('-').map((v) => parseInt(v, 10));
+
+  const months = [-2, -1, 0].map((offset) => {
+    const d = new Date(tYear, tMonth - 1 + offset, 1);
+    const key = getCurrentMonthKey(d);
+    const label = formatMonthDisplay(key, true);
+    return { key, label };
+  });
 
   const monthData = months.map((m) => {
     const cf = calculateMonthlyCashflow(transactions, m.key, baseCurrency);

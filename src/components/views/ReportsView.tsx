@@ -16,6 +16,8 @@ import {
   calculateCategorySpending,
   calculateMonthlyCashflow,
   formatCurrency,
+  getAvailableMonthsList,
+  formatMonthDisplay,
 } from '../../utils/finance';
 import { CashflowTrendChart } from '../charts/CashflowTrendChart';
 import { ExpenseDonutChart } from '../charts/ExpenseDonutChart';
@@ -41,8 +43,11 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
 }) => {
   const [isExportOpen, setIsExportOpen] = useState(false);
 
-  // Available months
-  const months = ['2026-10', '2026-09', '2026-08'];
+  // Available months dynamically computed from transactions
+  const allMonths = getAvailableMonthsList(transactions);
+  const months = allMonths.includes(selectedMonth)
+    ? allMonths.slice(0, 4)
+    : [selectedMonth, ...allMonths.filter((m) => m !== selectedMonth)].slice(0, 4);
 
   // Cashflow for selected month
   const cashflow = calculateMonthlyCashflow(transactions, selectedMonth, baseCurrency);
@@ -98,13 +103,13 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
                   key={m}
                   type="button"
                   onClick={() => onSelectMonth(m)}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                     isSelected
                       ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'
                   }`}
                 >
-                  {m === '2026-10' ? 'Oct' : m === '2026-09' ? 'Sep' : 'Aug'}
+                  {formatMonthDisplay(m, true)}
                 </button>
               );
             })}
@@ -201,6 +206,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({
           transactions={transactions}
           baseCurrency={baseCurrency}
           isMasked={privacyMode}
+          selectedMonth={selectedMonth}
         />
       </div>
 

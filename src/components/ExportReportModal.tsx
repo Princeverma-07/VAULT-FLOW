@@ -1,7 +1,7 @@
 import React from 'react';
 import { X, Download, Printer, FileText } from 'lucide-react';
 import { Category, Transaction } from '../types';
-import { formatCurrency, generateCSV } from '../utils/finance';
+import { formatCurrency, generateCSV, formatMonthDisplay } from '../utils/finance';
 
 interface ExportReportModalProps {
   isOpen: boolean;
@@ -29,8 +29,12 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const monthTransactions = selectedMonth === 'all'
+    ? transactions
+    : transactions.filter((t) => t.date.startsWith(selectedMonth));
+
   const handleDownloadCSV = () => {
-    const csvContent = generateCSV(transactions, categories, baseCurrency);
+    const csvContent = generateCSV(monthTransactions, categories, baseCurrency);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -63,7 +67,7 @@ export const ExportReportModal: React.FC<ExportReportModalProps> = ({
               <h2 id="export-modal-title" className="text-base font-bold text-slate-900 dark:text-white">
                 Monthly Financial Statement
               </h2>
-              <p className="text-xs text-slate-500">Period: {selectedMonth}</p>
+              <p className="text-xs text-slate-500">Period: {formatMonthDisplay(selectedMonth)}</p>
             </div>
           </div>
           <button

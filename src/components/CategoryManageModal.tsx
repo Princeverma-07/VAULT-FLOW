@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Check } from 'lucide-react';
+import { X, Plus, Check, Trash2 } from 'lucide-react';
 import { Category } from '../types';
 import { formatCurrency } from '../utils/finance';
 import { CategoryIcon } from './CategoryIcon';
@@ -9,6 +9,7 @@ interface CategoryManageModalProps {
   onClose: () => void;
   categories: Category[];
   onAddCategory: (category: Category) => void;
+  onDeleteCategory?: (categoryId: string) => void;
   onUpdateCategoryBudget: (categoryId: string, newLimit: number) => void;
   baseCurrency: string;
 }
@@ -28,6 +29,7 @@ export const CategoryManageModal: React.FC<CategoryManageModalProps> = ({
   onClose,
   categories,
   onAddCategory,
+  onDeleteCategory,
   onUpdateCategoryBudget,
   baseCurrency,
 }) => {
@@ -133,21 +135,34 @@ export const CategoryManageModal: React.FC<CategoryManageModalProps> = ({
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs font-bold text-slate-400 font-mono">
-                        {baseCurrency}
-                      </span>
-                      <input
-                        type="number"
-                        min="0"
-                        placeholder="No limit"
-                        value={cat.budgetLimit !== undefined ? cat.budgetLimit : ''}
-                        onChange={(e) => {
-                          const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                          onUpdateCategoryBudget(cat.id, val);
-                        }}
-                        className="w-24 text-right bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 tabular-nums"
-                      />
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-400 font-mono">
+                          {baseCurrency}
+                        </span>
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="No limit"
+                          value={cat.budgetLimit && cat.budgetLimit > 0 ? cat.budgetLimit : ''}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? 0 : Math.max(0, parseFloat(e.target.value));
+                            onUpdateCategoryBudget(cat.id, val);
+                          }}
+                          className="w-24 text-right bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 tabular-nums"
+                        />
+                      </div>
+                      {onDeleteCategory && cat.id.startsWith('cat_custom_') && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteCategory(cat.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          title="Delete custom category"
+                          aria-label={`Delete ${cat.name}`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
