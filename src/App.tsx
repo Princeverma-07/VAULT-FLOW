@@ -27,6 +27,14 @@ import {
   deleteRemoteTransaction,
   updateRemoteMonthlyBudget,
   fetchRemoteVaultData,
+  createOrUpdateRemoteGoal,
+  deleteRemoteGoal,
+  createOrUpdateRemoteBill,
+  deleteRemoteBill,
+  createOrUpdateRemoteCategory,
+  deleteRemoteCategory,
+  updateRemotePreferences,
+  syncLocalVaultToSupabase,
 } from './services/supabaseService';
 
 export default function App() {
@@ -100,26 +108,55 @@ export default function App() {
   const [isCloudSyncOpen, setIsCloudSyncOpen] = useState(false);
   const [isCloudConfigured, setIsCloudConfigured] = useState(() => getSupabaseConfig().isConfigured);
 
-  // Check Supabase session on startup and fetch remote data if user is logged in
+  // Check Supabase session on startup and listen for auth state changes across mobile & laptop
   useEffect(() => {
     const supabase = getSupabaseClient();
-    if (supabase) {
-      setIsCloudConfigured(true);
-      supabase.auth.getSession().then(({ data }) => {
-        const userId = data.session?.user?.id;
-        if (userId) {
-          fetchRemoteVaultData(userId, categories, preferences).then((remote) => {
-            if (remote && remote.transactions.length > 0) {
-              setTransactions(remote.transactions);
-              setCategories(remote.categories);
-              setSavingsGoals(remote.savingsGoals);
-              setRecurringBills(remote.recurringBills);
-              setPreferences(remote.preferences);
-            }
+    if (!supabase) return;
+
+    setIsCloudConfigured(true);
+
+    const applyRemoteData = async (userId: string) => {
+      try {
+        const remote = await fetchRemoteVaultData(userId, categories, preferences);
+        if (remote && remote.transactions && remote.transactions.length > 0) {
+          setTransactions(remote.transactions);
+          setCategories(remote.categories);
+          setSavingsGoals(remote.savingsGoals);
+          setRecurringBills(remote.recurringBills);
+          setPreferences(remote.preferences);
+        } else if (transactions.length > 0) {
+          // If remote cloud has no transactions yet, auto-sync local records so they appear on other devices
+          await syncLocalVaultToSupabase(userId, {
+            transactions,
+            categories,
+            savingsGoals,
+            recurringBills,
+            preferences,
           });
         }
-      });
-    }
+      } catch (err) {
+        console.warn('Auto-sync error:', err);
+      }
+    };
+
+    // 1. Initial session check on website load
+    supabase.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user?.id;
+      if (userId) {
+        applyRemoteData(userId);
+      }
+    });
+
+    // 2. Real-time auth state listener (Syncs on sign-in, token refresh, or sign-out)
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user?.id && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED')) {
+        applyRemoteData(session.user.id);
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   // Keep app synced with live exact current month
@@ -273,39 +310,113 @@ export default function App() {
 
   const handleUpdateCategoryBudget = (catId: string, limit: number) => {
     setCategories((prev) =>
-      prev.map((c) => (c.id === catId ? { ...c, budgetLimit: limit } : c))
+      prev.map((c) => {
+        if (c.id === catId) {
+          const updated = { ...c, budgetLimit: limit };
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            supabase.auth.getSession().then(({ data }) => {
+              if (data.session?.user?.id) {
+                createOrUpdateRemoteCategory(data.session.user.id, updated);
+              }
+            });
+          }
+          return updated;
+        }
+        return c;
+      })
     );
   };
 
   const handleAddCategory = (newCat: Category) => {
     setCategories((prev) => [...prev, newCat]);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          createOrUpdateRemoteCategory(data.session.user.id, newCat);
+        }
+      });
+    }
   };
 
   const handleDeleteCategory = (catId: string) => {
     setCategories((prev) => prev.filter((c) => c.id !== catId));
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          deleteRemoteCategory(data.session.user.id, catId);
+        }
+      });
+    }
   };
 
   const handleAddSavingsGoal = (newGoal: SavingsGoal) => {
     setSavingsGoals((prev) => [...prev, newGoal]);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          createOrUpdateRemoteGoal(data.session.user.id, newGoal);
+        }
+      });
+    }
   };
 
   const handleDeleteSavingsGoal = (goalId: string) => {
     setSavingsGoals((prev) => prev.filter((g) => g.id !== goalId));
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          deleteRemoteGoal(data.session.user.id, goalId);
+        }
+      });
+    }
   };
 
   const handleAddRecurringBill = (newBill: RecurringBill) => {
     setRecurringBills((prev) => [...prev, newBill]);
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          createOrUpdateRemoteBill(data.session.user.id, newBill);
+        }
+      });
+    }
   };
 
   const handleDeleteRecurringBill = (billId: string) => {
     setRecurringBills((prev) => prev.filter((b) => b.id !== billId));
+    const supabase = getSupabaseClient();
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session?.user?.id) {
+          deleteRemoteBill(data.session.user.id, billId);
+        }
+      });
+    }
   };
 
   const handleDepositToGoal = (goalId: string, amount: number) => {
     setSavingsGoals((prev) =>
-      prev.map((g) =>
-        g.id === goalId ? { ...g, currentAmount: g.currentAmount + amount } : g
-      )
+      prev.map((g) => {
+        if (g.id === goalId) {
+          const updated = { ...g, currentAmount: g.currentAmount + amount };
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            supabase.auth.getSession().then(({ data }) => {
+              if (data.session?.user?.id) {
+                createOrUpdateRemoteGoal(data.session.user.id, updated);
+              }
+            });
+          }
+          return updated;
+        }
+        return g;
+      })
     );
     // Also record a savings transfer transaction
     handleAddTransaction({

@@ -2,22 +2,26 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Cloud,
-  CloudCheck,
-  CloudOff,
   RefreshCw,
   LogIn,
   LogOut,
-  Key,
-  ShieldCheck,
+  UserCheck,
   CheckCircle2,
   AlertCircle,
   ExternalLink,
+  Smartphone,
+  Laptop,
+  ArrowRight,
+  ShieldCheck,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   getSupabaseClient,
   getSupabaseConfig,
   saveSupabaseCredentials,
   clearSupabaseCredentials,
+  checkSupabaseHealth,
 } from '../lib/supabase';
 import { syncLocalVaultToSupabase, fetchRemoteVaultData } from '../services/supabaseService';
 import { Category, RecurringBill, SavingsGoal, Transaction, UserPreferences } from '../types';
@@ -50,62 +54,75 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
   onApplyRemoteVault,
 }) => {
   const [config, setConfig] = useState(getSupabaseConfig());
-  const [urlInput, setUrlInput] = useState(config.url);
-  const [keyInput, setKeyInput] = useState(config.anonKey);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
+  const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
+  const [manualUrl, setManualUrl] = useState(config.url);
+  const [manualKey, setManualKey] = useState(config.anonKey);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
-      const cfg = getSupabaseConfig();
-      setConfig(cfg);
-      setUrlInput(cfg.url);
-      setKeyInput(cfg.anonKey);
+      const currentConfig = getSupabaseConfig();
+      setConfig(currentConfig);
+      setManualUrl(currentConfig.url);
+      setManualKey(currentConfig.anonKey);
       setStatusMessage(null);
-      checkUserSession();
+      checkSessionAndHealth();
     }
   }, [isOpen]);
 
-  const checkUserSession = async () => {
+  const checkSessionAndHealth = async () => {
     const supabase = getSupabaseClient();
     if (!supabase) {
       setUserEmail(null);
+      setUserId(null);
       return;
     }
-    const { data } = await supabase.auth.getSession();
-    setUserEmail(data.session?.user?.email || null);
+
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        setStatusMessage({ type: 'error', text: `Session error: ${error.message}` });
+        setUserEmail(null);
+        setUserId(null);
+        return;
+      }
+
+      if (data.session?.user) {
+        setUserEmail(data.session.user.email || 'Authenticated User');
+        setUserId(data.session.user.id);
+      } else {
+        setUserEmail(null);
+        setUserId(null);
+      }
+    } catch (err: any) {
+      console.warn('Session check warning:', err);
+      setUserEmail(null);
+      setUserId(null);
+    }
   };
 
   if (!isOpen) return null;
-
-  const handleSaveConfig = () => {
-    if (!urlInput.trim() || !keyInput.trim()) {
-      setStatusMessage({ type: 'error', text: 'Please enter both Supabase URL and Anon Key.' });
-      return;
-    }
-    saveSupabaseCredentials(urlInput.trim(), keyInput.trim());
-    const updated = getSupabaseConfig();
-    setConfig(updated);
-    setStatusMessage({ type: 'success', text: 'Supabase credentials saved successfully.' });
-    checkUserSession();
-  };
-
-  const handleDisconnect = () => {
-    clearSupabaseCredentials();
-    setConfig(getSupabaseConfig());
-    setUserEmail(null);
-    setStatusMessage({ type: 'success', text: 'Supabase disconnected. Switched to Local Mode.' });
-  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const supabase = getSupabaseClient();
     if (!supabase) {
-      setStatusMessage({ type: 'error', text: 'Connect Supabase credentials first.' });
+      setStatusMessage({
+        type: 'error',
+        text: 'Supabase is not configured yet. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your environment.',
+      });
+      return;
+    }
+
+    if (!authEmail.trim() || !authPassword.trim()) {
+      setStatusMessage({ type: 'error', text: 'Please enter both email and password.' });
       return;
     }
 
@@ -118,16 +135,42 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
           email: authEmail.trim(),
           password: authPassword,
         });
+
         if (error) throw error;
+
+        const currentUserId = data.user?.id;
         setUserEmail(data.user?.email || null);
-        setStatusMessage({ type: 'success', text: `Signed in as ${data.user?.email}` });
-        
-        // Auto-fetch remote data
-        if (data.user?.id) {
-          const remote = await fetchRemoteVaultData(data.user.id, categories, preferences);
-          if (remote && remote.transactions.length > 0) {
+        setUserId(currentUserId || null);
+        setStatusMessage({ type: 'success', text: `Signed in as ${data.user?.email}. Syncing data...` });
+
+        // Auto-fetch remote data from Supabase cloud database
+        if (currentUserId) {
+          const remote = await fetchRemoteVaultData(currentUserId, categories, preferences);
+          if (remote && remote.transactions && remote.transactions.length > 0) {
             onApplyRemoteVault(remote);
-            setStatusMessage({ type: 'success', text: 'Cloud data loaded into your vault!' });
+            setStatusMessage({
+              type: 'success',
+              text: `Synced! Loaded ${remote.transactions.length} transactions from Supabase cloud.`,
+            });
+          } else if (transactions.length > 0) {
+            // First time sync for this user: automatically push existing local records so no data is lost!
+            setStatusMessage({
+              type: 'info',
+              text: `Signed in! Syncing ${transactions.length} local records to your new cloud vault...`,
+            });
+            const pushRes = await syncLocalVaultToSupabase(currentUserId, {
+              transactions,
+              categories,
+              savingsGoals,
+              recurringBills,
+              preferences,
+            });
+            if (pushRes.success) {
+              setStatusMessage({
+                type: 'success',
+                text: `Connected! Successfully uploaded ${transactions.length} records to your Supabase cloud database.`,
+              });
+            }
           }
         }
       } else {
@@ -135,15 +178,37 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
           email: authEmail.trim(),
           password: authPassword,
         });
+
         if (error) throw error;
-        setUserEmail(data.user?.email || null);
-        setStatusMessage({
-          type: 'success',
-          text: data.session ? 'Account created and signed in!' : 'Account registered! Please check email to verify.',
-        });
+
+        if (data.session && data.user) {
+          setUserEmail(data.user.email || null);
+          setUserId(data.user.id);
+          setStatusMessage({
+            type: 'success',
+            text: 'Account created! Initializing your cloud vault...',
+          });
+
+          // Upload current records to new account
+          if (transactions.length > 0) {
+            await syncLocalVaultToSupabase(data.user.id, {
+              transactions,
+              categories,
+              savingsGoals,
+              recurringBills,
+              preferences,
+            });
+          }
+        } else {
+          setStatusMessage({
+            type: 'info',
+            text: 'Account registered! Please check your email inbox to confirm your account, then sign in.',
+          });
+        }
       }
     } catch (err: any) {
-      setStatusMessage({ type: 'error', text: err.message || 'Authentication failed' });
+      console.error('Auth error:', err);
+      setStatusMessage({ type: 'error', text: err.message || 'Authentication failed. Please verify credentials.' });
     } finally {
       setIsLoading(false);
     }
@@ -155,43 +220,67 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
       await supabase.auth.signOut();
     }
     setUserEmail(null);
-    setStatusMessage({ type: 'success', text: 'Signed out successfully.' });
+    setUserId(null);
+    setStatusMessage({ type: 'success', text: 'Signed out. Operating in offline/local mode.' });
   };
 
-  const handlePushLocalDataToCloud = async () => {
-    const supabase = getSupabaseClient();
-    if (!supabase) return;
-
-    const { data } = await supabase.auth.getSession();
-    const userId = data.session?.user?.id;
-    if (!userId) {
-      setStatusMessage({ type: 'error', text: 'Sign in to upload your data to Supabase.' });
-      return;
-    }
-
-    setIsLoading(true);
+  const handleManualSyncNow = async () => {
+    if (!userId) return;
+    setIsSyncing(true);
     setStatusMessage(null);
 
-    const res = await syncLocalVaultToSupabase(userId, {
-      transactions,
-      categories,
-      savingsGoals,
-      recurringBills,
-      preferences,
-    });
+    try {
+      // 1. Fetch remote changes
+      const remote = await fetchRemoteVaultData(userId, categories, preferences);
+      if (remote && remote.transactions && remote.transactions.length > 0) {
+        onApplyRemoteVault(remote);
+      }
 
-    setIsLoading(false);
-    if (res.success) {
-      setStatusMessage({
-        type: 'success',
-        text: `Successfully synced ${transactions.length} transactions and settings to Supabase!`,
+      // 2. Push any local state
+      const res = await syncLocalVaultToSupabase(userId, {
+        transactions,
+        categories,
+        savingsGoals,
+        recurringBills,
+        preferences,
       });
-    } else {
-      setStatusMessage({
-        type: 'error',
-        text: res.error || 'Failed to sync data to Supabase.',
-      });
+
+      if (res.success) {
+        setStatusMessage({
+          type: 'success',
+          text: `Everything in sync! Updated across your mobile and laptop devices.`,
+        });
+      } else {
+        setStatusMessage({
+          type: 'error',
+          text: res.error || 'Sync encountered an issue.',
+        });
+      }
+    } catch (err: any) {
+      setStatusMessage({ type: 'error', text: err.message || 'Sync failed.' });
+    } finally {
+      setIsSyncing(false);
     }
+  };
+
+  const handleSaveManualOverride = () => {
+    if (!manualUrl.trim() || !manualKey.trim()) {
+      setStatusMessage({ type: 'error', text: 'Enter both URL and Key for manual override.' });
+      return;
+    }
+    saveSupabaseCredentials(manualUrl.trim(), manualKey.trim());
+    const updated = getSupabaseConfig();
+    setConfig(updated);
+    setStatusMessage({ type: 'success', text: 'Custom credentials saved. Re-initializing...' });
+    checkSessionAndHealth();
+  };
+
+  const handleClearManualOverride = () => {
+    clearSupabaseCredentials();
+    setConfig(getSupabaseConfig());
+    setUserEmail(null);
+    setUserId(null);
+    setStatusMessage({ type: 'info', text: 'Reset to environment variables mode.' });
   };
 
   return (
@@ -203,17 +292,17 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
     >
       <div className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-slate-100 dark:border-slate-800">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-              <Cloud size={18} />
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Cloud size={19} />
             </div>
             <div>
               <h2 id="supabase-modal-title" className="text-sm font-bold text-slate-900 dark:text-white">
                 Supabase Cloud Database &amp; Sync
               </h2>
               <p className="text-[11px] text-slate-500">
-                Multi-device persistent cloud storage with Row Level Security
+                Seamless multi-device sync across Mobile &amp; Laptop
               </p>
             </div>
           </div>
@@ -230,209 +319,285 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-5 text-xs text-slate-700 dark:text-slate-300">
-          {/* Status Badge */}
+          {/* Connection Status Indicator */}
           <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <div
                 className={`w-2.5 h-2.5 rounded-full ${
-                  config.isConfigured ? 'bg-emerald-500' : 'bg-slate-400'
+                  config.isConfigured
+                    ? userEmail
+                      ? 'bg-emerald-500 ring-4 ring-emerald-500/20'
+                      : 'bg-emerald-500'
+                    : 'bg-amber-500'
                 }`}
               />
-              <span className="font-semibold text-slate-900 dark:text-white">
-                {config.isConfigured ? 'Supabase Connected' : 'Local Storage Mode'}
-              </span>
+              <div>
+                <span className="font-semibold text-slate-900 dark:text-white block">
+                  {config.isConfigured
+                    ? userEmail
+                      ? 'Live Cloud Sync Active'
+                      : 'Supabase Cloud Connected'
+                    : 'Pending Environment Setup'}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {userEmail
+                    ? `Signed in as ${userEmail}`
+                    : config.isConfigured
+                    ? 'Ready for email sign in / sign up'
+                    : 'Configure VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY'}
+                </span>
+              </div>
             </div>
-            <span className="text-[11px] font-mono text-slate-400">
-              {config.source === 'env'
-                ? '.env config'
-                : config.source === 'storage'
-                ? 'Custom credentials'
-                : 'Offline'}
-            </span>
+
+            <div className="flex items-center gap-1.5 text-slate-500 text-[11px] font-medium">
+              <Laptop size={14} className="text-slate-400" />
+              <span>&harr;</span>
+              <Smartphone size={14} className="text-slate-400" />
+            </div>
           </div>
 
-          {/* Alert / Feedback message */}
+          {/* Feedback / Alert messages */}
           {statusMessage && (
             <div
               className={`p-3 rounded-xl flex items-start gap-2 border text-xs font-medium ${
                 statusMessage.type === 'success'
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200'
+                  : statusMessage.type === 'info'
+                  ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
                   : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200'
               }`}
             >
               {statusMessage.type === 'success' ? (
-                <CheckCircle2 size={15} className="shrink-0 text-emerald-600" />
+                <CheckCircle2 size={15} className="shrink-0 text-emerald-600 mt-0.5" />
+              ) : statusMessage.type === 'info' ? (
+                <ShieldCheck size={15} className="shrink-0 text-blue-600 mt-0.5" />
               ) : (
-                <AlertCircle size={15} className="shrink-0 text-rose-500" />
+                <AlertCircle size={15} className="shrink-0 text-rose-500 mt-0.5" />
               )}
-              <span>{statusMessage.text}</span>
+              <span className="leading-snug">{statusMessage.text}</span>
             </div>
           )}
 
-          {/* Section 1: Credentials Setup */}
-          {!config.isConfigured ? (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
-                  Connect Supabase Project
-                </span>
-                <a
-                  href="https://supabase.com/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 text-[11px]"
+          {/* User Logged In Zone */}
+          {userEmail ? (
+            <div className="space-y-4">
+              <div className="p-4 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/80 dark:border-emerald-800/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserCheck size={16} className="text-emerald-600 dark:text-emerald-400" />
+                    <span className="font-bold text-slate-900 dark:text-white">Active Account</span>
+                  </div>
+                  <span className="text-[10px] bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                    RLS Secured
+                  </span>
+                </div>
+
+                <div className="text-xs">
+                  <p className="font-semibold text-slate-900 dark:text-slate-100 break-all">{userEmail}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Your records sync automatically whenever you add or edit transactions on any device.
+                  </p>
+                </div>
+
+                {/* Vault Sync Stats */}
+                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-200/50 dark:border-emerald-800/40 text-center text-[11px]">
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-xl">
+                    <span className="block font-black text-slate-900 dark:text-white text-sm">{transactions.length}</span>
+                    <span className="text-slate-400 text-[10px]">Transactions</span>
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-xl">
+                    <span className="block font-black text-slate-900 dark:text-white text-sm">{categories.length}</span>
+                    <span className="text-slate-400 text-[10px]">Categories</span>
+                  </div>
+                  <div className="p-2 bg-white dark:bg-slate-800 rounded-xl">
+                    <span className="block font-black text-slate-900 dark:text-white text-sm">{savingsGoals.length + recurringBills.length}</span>
+                    <span className="text-slate-400 text-[10px]">Goals &amp; Bills</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleManualSyncNow}
+                  disabled={isSyncing}
+                  className="flex-1 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                 >
-                  <span>Supabase Dashboard</span>
-                  <ExternalLink size={11} />
-                </a>
-              </div>
-              <p className="text-slate-500 text-[11px] leading-relaxed">
-                Enter your Supabase Project URL and Anon Public Key (from Project Settings &rarr; API) to enable real-time cloud persistence:
-              </p>
+                  <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                  <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                </button>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Project URL
-                </label>
-                <input
-                  type="text"
-                  placeholder="https://xyzprojectid.supabase.co"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="py-2.5 px-4 bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-slate-700 dark:text-slate-300 hover:text-rose-600 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <LogOut size={14} />
+                  <span>Sign Out</span>
+                </button>
               </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                  Anon / Public API Key
-                </label>
-                <input
-                  type="password"
-                  placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  value={keyInput}
-                  onChange={(e) => setKeyInput(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white font-mono focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
-
-              <button
-                type="button"
-                onClick={handleSaveConfig}
-                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer"
-              >
-                <Key size={14} />
-                <span>Save &amp; Connect Supabase</span>
-              </button>
             </div>
           ) : (
+            /* User Not Logged In: Fast Email Sign In / Sign Up */
             <div className="space-y-4">
-              {/* Authenticated User or Login Form */}
-              {userEmail ? (
-                <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/60 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold tracking-wider block">
-                        Logged in as
-                      </span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">
-                        {userEmail}
-                      </span>
-                    </div>
+              {/* Tab Selector */}
+              <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('signin')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    authMode === 'signin'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('signup')}
+                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    authMode === 'signup'
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
 
-                    <button
-                      type="button"
-                      onClick={handleSignOut}
-                      className="px-2.5 py-1 text-[11px] font-semibold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer border border-rose-200 dark:border-rose-900"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
+              <p className="text-slate-500 text-[11px] leading-relaxed">
+                {authMode === 'signin'
+                  ? 'Sign in with your email to load your transactions and budgets across mobile, laptop, or tablet.'
+                  : 'Register a new account to isolate and encrypt your data with Row Level Security.'}
+              </p>
 
-                  {/* Sync Actions */}
-                  <div className="pt-2 border-t border-emerald-200/60 dark:border-emerald-800/40 space-y-2">
-                    <p className="text-[11px] text-slate-500">
-                      Sync your current local balance, {transactions.length} transactions, and budgets to your Supabase account:
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handlePushLocalDataToCloud}
-                      disabled={isLoading}
-                      className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-                      <span>{isLoading ? 'Syncing...' : 'Upload & Sync Local Data to Cloud'}</span>
-                    </button>
-                  </div>
+              <form onSubmit={handleAuthSubmit} className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Email Address
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="you@example.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
                 </div>
-              ) : (
-                <form onSubmit={handleAuthSubmit} className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-[11px]">
-                      {authMode === 'signin' ? 'Sign In to Sync' : 'Create Supabase Account'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold text-[11px]"
-                    >
-                      {authMode === 'signin' ? 'Need an account? Sign Up' : 'Already have an account? Sign In'}
-                    </button>
-                  </div>
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="you@example.com"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="Min 6 characters"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                </div>
 
-                  <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">
-                      Password
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      placeholder="••••••••"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-2.5 rounded-xl bg-slate-900 dark:bg-emerald-600 text-white font-semibold text-xs flex items-center justify-center gap-1.5 shadow-sm hover:opacity-95 transition-opacity cursor-pointer disabled:opacity-50"
-                  >
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-bold rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <RefreshCw size={14} className="animate-spin" />
+                  ) : (
                     <LogIn size={14} />
-                    <span>{isLoading ? 'Processing...' : authMode === 'signin' ? 'Sign In & Load Data' : 'Sign Up'}</span>
-                  </button>
-                </form>
-              )}
-
-              {/* Manage Connection Button */}
-              {config.source === 'storage' && (
-                <div className="pt-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={handleDisconnect}
-                    className="text-xs text-slate-400 hover:text-rose-500 underline cursor-pointer"
-                  >
-                    Disconnect Supabase Project
-                  </button>
-                </div>
-              )}
+                  )}
+                  <span>
+                    {isLoading
+                      ? 'Connecting...'
+                      : authMode === 'signin'
+                      ? 'Sign In & Load Cloud Data'
+                      : 'Create Account & Start Sync'}
+                  </span>
+                </button>
+              </form>
             </div>
           )}
+
+          {/* Privacy & Security Note */}
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-800 flex items-start gap-2 text-[11px] text-slate-500">
+            <ShieldCheck size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+            <p>
+              Row Level Security ensures your transactions can only be read or edited by your authenticated account. Your device PIN lock remains strictly local to this device.
+            </p>
+          </div>
+
+          {/* Collapsible Advanced / Dev Override Section */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setShowAdvancedConfig(!showAdvancedConfig)}
+              className="w-full flex items-center justify-between text-[11px] text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer py-1"
+            >
+              <span>Advanced / Development Settings</span>
+              {showAdvancedConfig ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+
+            {showAdvancedConfig && (
+              <div className="mt-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 space-y-3 text-[11px]">
+                <p className="text-slate-500">
+                  {config.source === 'env'
+                    ? 'Using production environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY). All connected devices share this cloud configuration automatically.'
+                    : 'Environment variables not detected. You can test a custom Supabase URL and Key for this browser only:'}
+                </p>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
+                    VITE_SUPABASE_URL
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="https://xyz.supabase.co"
+                    value={manualUrl}
+                    onChange={(e) => setManualUrl(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-0.5">
+                    VITE_SUPABASE_ANON_KEY
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="eyJhbGciOiJIUzI1Ni..."
+                    value={manualKey}
+                    onChange={(e) => setManualKey(e.target.value)}
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-[11px]"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleSaveManualOverride}
+                    className="px-3 py-1 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg font-semibold hover:opacity-90 cursor-pointer"
+                  >
+                    Save Override
+                  </button>
+                  {config.source === 'storage' && (
+                    <button
+                      type="button"
+                      onClick={handleClearManualOverride}
+                      className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-medium hover:bg-slate-300 cursor-pointer"
+                    >
+                      Clear Override
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

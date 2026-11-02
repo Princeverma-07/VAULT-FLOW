@@ -533,7 +533,7 @@ export const PlanningView: React.FC<PlanningViewProps> = ({
               onClick={onOpenCloudSync}
               className="px-3.5 py-2 text-xs font-bold bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white rounded-xl transition-colors cursor-pointer shrink-0 text-center"
             >
-              {isCloudConnected ? 'Manage Cloud Sync' : 'Connect Supabase'}
+              {isCloudConnected ? 'Cloud Sync & Account' : 'Connect Cloud Sync'}
             </button>
           )}
         </div>

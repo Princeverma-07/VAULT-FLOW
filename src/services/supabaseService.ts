@@ -391,3 +391,159 @@ export async function updateRemoteMonthlyBudget(
     console.error('Error updating remote monthly budget:', err);
   }
 }
+
+/**
+ * Saves or updates a savings goal on Supabase
+ */
+export async function createOrUpdateRemoteGoal(
+  userId: string,
+  goal: SavingsGoal
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('savings_goals').upsert({
+      id: goal.id,
+      user_id: userId,
+      name: goal.name,
+      target_amount: goal.targetAmount,
+      current_amount: goal.currentAmount,
+      currency: goal.currency || 'INR',
+      deadline_date: goal.deadlineDate || null,
+      icon_name: goal.iconName,
+      color: goal.color,
+    }, { onConflict: 'id' });
+  } catch (err) {
+    console.error('Error updating remote savings goal:', err);
+  }
+}
+
+/**
+ * Deletes a savings goal on Supabase
+ */
+export async function deleteRemoteGoal(
+  userId: string,
+  goalId: string
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('savings_goals').delete().eq('user_id', userId).eq('id', goalId);
+  } catch (err) {
+    console.error('Error deleting remote savings goal:', err);
+  }
+}
+
+/**
+ * Saves or updates a recurring bill on Supabase
+ */
+export async function createOrUpdateRemoteBill(
+  userId: string,
+  bill: RecurringBill
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('recurring_bills').upsert({
+      id: bill.id,
+      user_id: userId,
+      name: bill.name,
+      amount: bill.amount,
+      currency: bill.currency || 'INR',
+      category_id: bill.categoryId,
+      billing_cycle: bill.billingCycle,
+      next_billing_date: bill.nextBillingDate,
+      auto_deduct: bill.autoDeduct,
+      icon_name: bill.iconName,
+    }, { onConflict: 'id' });
+  } catch (err) {
+    console.error('Error updating remote recurring bill:', err);
+  }
+}
+
+/**
+ * Deletes a recurring bill on Supabase
+ */
+export async function deleteRemoteBill(
+  userId: string,
+  billId: string
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('recurring_bills').delete().eq('user_id', userId).eq('id', billId);
+  } catch (err) {
+    console.error('Error deleting remote recurring bill:', err);
+  }
+}
+
+/**
+ * Saves or updates custom categories on Supabase
+ */
+export async function createOrUpdateRemoteCategory(
+  userId: string,
+  category: Category
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('categories').upsert({
+      id: category.id,
+      user_id: userId,
+      name: category.name,
+      icon_name: category.iconName,
+      color: category.color,
+      type: category.type,
+      budget_limit: category.budgetLimit || 0,
+      is_default: category.id.startsWith('cat_') && !category.id.startsWith('cat_custom_'),
+    }, { onConflict: 'id' });
+  } catch (err) {
+    console.error('Error updating remote category:', err);
+  }
+}
+
+/**
+ * Deletes a custom category on Supabase
+ */
+export async function deleteRemoteCategory(
+  userId: string,
+  categoryId: string
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('categories').delete().eq('user_id', userId).eq('id', categoryId);
+  } catch (err) {
+    console.error('Error deleting remote category:', err);
+  }
+}
+
+/**
+ * Updates user preferences on Supabase
+ */
+export async function updateRemotePreferences(
+  userId: string,
+  prefs: Partial<UserPreferences>
+): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return;
+
+  try {
+    await supabase.from('user_preferences').upsert({
+      user_id: userId,
+      base_currency: prefs.baseCurrency,
+      privacy_mode: prefs.privacyMode,
+      theme: prefs.theme,
+      is_phone_frame_view: prefs.isPhoneFrameView,
+    }, { onConflict: 'user_id' });
+  } catch (err) {
+    console.error('Error updating remote user preferences:', err);
+  }
+}
+
